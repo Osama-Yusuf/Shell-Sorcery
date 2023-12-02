@@ -2,10 +2,9 @@
 
 
 
-<center>
+<div align="center">
+    <img src="./wizard.png" alt="Profile Image" style="border-radius: 50%; width: 200px; height: 200px; object-fit: cover;">
+</div>
 
-  <img src="https://avatars.githubusercontent.com/u/151399704?s=400&u=d19079500aac2a0635787a41c61c773be8003496&v=4"/>  
-  
-</center>
 
 
