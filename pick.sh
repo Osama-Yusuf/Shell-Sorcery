@@ -163,14 +163,29 @@ del_host(){
 
 if [ "$1" == "eks" ]
 then
+	if [ "$2" == "cur" ]
+	then
+		kubectl config current-context
+		exit 1
+	fi
 	fzf_checker
 	eks_selector
 elif [ "$1" == "aws" ]
 then
+	if [ "$2" == "cur" ]
+	then
+		echo $AWS_PROFILE
+		exit 1
+	fi
 	fzf_checker
 	aws_selector
 elif [ "$1" == "ns" ]
 then
+	if [ "$2" == "cur" ]
+	then
+		kubectl config view --minify --output 'jsonpath={..namespace}'
+		exit 1
+	fi
 	# check if fzf is installed if not install it
 	fzf_checker
 	namespace_selector
@@ -223,5 +238,42 @@ elif [ "$1" == "host" ]; then
 	pickhost_checker
 	host_selector
 else
-	echo "Usage: pick.sh {eks |ns| host( add(host | group) | edit | help | remove(host | group) )}"
+	echo "Usage: pick.sh {command}
+
+Commands:
+eks
+   - Pick an EKS cluster from "$HOME/.kube/config" as the default.
+   Subcommands:
+	cur
+		- Shows the current EKS cluster
+
+aws
+   - Pick an AWS profile from "$HOME/.aws/credentials" as the default.
+   Subcommands:
+	cur
+		- Shows the current AWS profile
+
+ns
+   - Pick a K8s namespace from the default cluster as the default.
+   Subcommands:
+	cur
+		- Shows the current K8s namespace
+
+host
+   - Pick a host to SSH into
+   Subcommands:
+	add
+		- Adds a new host or group
+		Options:
+			host - Add a new host
+			group - Add a new group
+
+	edit
+		- Edits the hosts file in vsCode
+
+	remove
+		- Removes an existing host or group
+		Options:
+			host - Remove a host
+			group - Remove a group"
 fi
