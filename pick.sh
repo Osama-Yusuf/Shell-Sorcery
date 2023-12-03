@@ -54,13 +54,7 @@ namespace_selector() {
 }
 
 eks_selector() {
-	selected_cluster=$(kubectl config get-contexts | grep -v NAME | awk '{print $2}' | fzf --multi --cycle --reverse --height 10% --border --prompt "Select a cluster: " --preview "echo {}" --preview-window down:1:wrap)
-	# Check if a cluster was selected
-	if [ -z "$selected_cluster" ]; then
-		echo "No cluster selected. Exiting."
-		exit 1
-	fi
-	kubectl config use-context $selected_cluster
+	kubectl config use-context $(kubectl config get-contexts | grep -v NAME | awk '{print $2}' | fzf --multi --cycle --reverse --height 10% --border --prompt "Select a cluster: " --preview "echo {}" --preview-window down:1:wrap)
 }
 
 # Function to list and select a group using fzf
