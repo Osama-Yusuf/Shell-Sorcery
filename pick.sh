@@ -167,6 +167,14 @@ then
 	then
 		kubectl config current-context
 		exit 1
+	elif [  "$2" == "update" ]
+	then
+		if [ -z "$3" ]; then
+			echo "No cluster given. Exiting."
+			exit 1
+		fi
+		aws eks update-kubeconfig --name $3
+		exit 1
 	fi
 	fzf_checker
 	eks_selector
@@ -246,6 +254,8 @@ eks
    Subcommands:
 	cur
 		- Shows the current EKS cluster
+	update <cluster name here>
+		- Update kubeconfig file with new cluster by your aws creds.
 
 aws
    - Pick an AWS profile from "$HOME/.aws/credentials" as the default.
