@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# This script snipe most pid that takes whether most cpu or memory given as a arg when executing this script. (cpu / mem)
+
 # Function to display process info and prompt for confirmation
 confirm_and_kill() {
     local pid=$1
