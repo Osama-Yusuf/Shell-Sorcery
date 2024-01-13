@@ -102,9 +102,24 @@ function handle_dock() {
         echo "  -ct, --created  Remove all created containers (not running)"
         echo "  -i, --image     Remove specific image by id"
         echo "  -c, --container Remove specific container/s by id"
+        echo "  -k, --kill kill specific container/s by id"
         echo "  -h, --help      Display this help and exit"
         return
     fi
+
+    # Inner function to select Docker images or containers using fzf
+    select_with_fzf() {
+        local mode=$1 # "image" or "container"
+        local selected
+
+        if [ "$mode" == "image" ]; then
+            selected=$(docker images | grep -v REPOSITORY | fzf --height 40% --border --ansi | awk '{print $3}')
+        elif [ "$mode" == "container" ]; then
+            selected=$(docker ps -a | grep -v "CONTAINER ID" | fzf --height 40% --border --ansi | awk '{print $1}')
+        fi
+
+        echo "$selected"
+    }
 
     # Docker-related operations
     case $option in
@@ -123,7 +138,7 @@ function handle_dock() {
             if [ -n "$conts" ]; then
                 docker rm -f $conts
             else
-                echo "No none containers"
+                echo "No none containers to delete."
             fi
             ;;
         # [Logic for deleting all exited containers]
@@ -171,40 +186,34 @@ function handle_dock() {
             if [ -n "$conts" ]; then
                 docker rm -f $conts
             else
-                echo -e "\nNo created containers"
+                echo -e "\nNo created containers to delete."
             fi
             ;;
         # [Logic for deleting specific image by id]
         -i|--image)
-            # variable that stores all arguments except the first one
-            local images=${args[@]:1}
-            if [ -n "$images" ]; then
-                local all_tags_provided=true
-                for image in $images; do
-                    if [[ $image != *":"* ]]; then
-                        all_tags_provided=false
-                        break
-                    fi
-                done
-                if $all_tags_provided; then
-                    echo -e "Trying to delete image ${args[@]:1}\n"
-                    docker rmi -f $images
-                else
-                    echo -e "Please mention the tag alongside the image name."
-                fi
+            local selected_images=$(select_with_fzf image)
+            if [ -n "$selected_images" ]; then
+                docker rmi -f $selected_images
             else
-                echo -e "\nNo images were given."
+                echo "No images selected to delete."
             fi
             ;;
         # [Logic for deleting specific container/s by id]
         -c|--container)
-            # variable that stores all arguments except the first one
-            conts=${args[@]:1}
-            echo -e "\nDeleting container $conts"
-            if [ -n "$conts" ]; then
-                docker rm -f $conts
+            local selected_containers=$(select_with_fzf container)
+            if [ -n "$selected_containers" ]; then
+                docker rm -f $selected_containers
             else
-                echo -e "\nNo container supplied"
+                echo "No containers selected to delete."
+            fi
+            ;;
+        # [Logic for deleting specific container/s by id]
+        -k|--kill)
+            local selected_containers=$(select_with_fzf container)
+            if [ -n "$selected_containers" ]; then
+                docker kill -f $selected_containers
+            else
+                echo "No containers selected to kill."
             fi
             ;;
         *)
@@ -228,6 +237,7 @@ function display_help() {
     echo "                         -ct, --created  Remove all created containers (not running)"
     echo "                         -i, --image     Remove specific image/s by id"
     echo "                         -c, --container Remove specific container/s by id"
+    echo "                         -k, --kill kill specific container/s by id"
     echo "Examples:"
     echo "  $0 port 8080"
     echo "  $0 res cpu"
