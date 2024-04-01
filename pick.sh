@@ -6,12 +6,27 @@ then
 	set -x
 fi
 
+# Determine the OS type
+OS=$(uname -s)
+
 # ---------------- get hosts from .ssh/config then ssh into it --------------- #
 # host=$(cat .ssh/config | grep "Host " | grep -v "#" | awk '{print $2}' | fzf)
 # ssh $host
 # ---------------------------------------------------------------------------- #
 
-CONFIG_FILE=~/.config/pickhost/hosts
+if [ "$OS" = "Darwin" ]; then
+	# macOS specific sed command
+	CONFIG_FILE="$HOME/Library/Application Support/pickhost/config/pickhost/hosts"
+elif [ "$OS" = "Linux" ]; then
+	# Check if we are on Ubuntu or Debian
+	if [ -f /etc/os-release ]; then
+		. /etc/os-release
+		if [ "$ID" = "ubuntu" ] || [ "$ID" = "debian" ]; then
+			# update the existing AWS_PROFILE value
+			CONFIG_FILE=~/.config/pickhost/hosts
+		fi
+	fi
+fi
 
 pickhost_checker() {
 	# check if pickhost is installed if not install it
@@ -119,13 +134,32 @@ aws_selector() {
 		exit 1
 	fi
 
-	# check if AWS_PROFILE is already set in .bashrc
-	if grep -q "export AWS_PROFILE=" "$HOME/.bashrc"; then
-		# update the existing AWS_PROFILE value
-		sed -i -e "s/export AWS_PROFILE=.*/export AWS_PROFILE=$selected_profile/" "$HOME/.bashrc"
-	else
-		# append the export statement to .bashrc
-		echo "export AWS_PROFILE=$selected_profile" >> "$HOME/.bashrc"
+	if [ "$OS" = "Darwin" ]; then
+		# macOS specific sed command
+		# check if AWS_PROFILE is already set in .bashrc
+		if grep -q "export AWS_PROFILE=" "$HOME/.zshrc"; then
+			# update the existing AWS_PROFILE value
+			sed -i '' -e "s/export AWS_PROFILE=.*/export AWS_PROFILE='$selected_profile'/" "$HOME/.zshrc"
+		else
+			# append the export statement to .bashrc
+			echo "export AWS_PROFILE=$selected_profile" >> "$HOME/.zshrc"
+		fi
+	elif [ "$OS" = "Linux" ]; then
+		# Check if we are on Ubuntu or Debian
+		if [ -f /etc/os-release ]; then
+			. /etc/os-release
+			if [ "$ID" = "ubuntu" ] || [ "$ID" = "debian" ]; then
+				# update the existing AWS_PROFILE value
+				# check if AWS_PROFILE is already set in .bashrc
+				if grep -q "export AWS_PROFILE=" "$HOME/.bashrc"; then
+					# update the existing AWS_PROFILE value
+					sed -i -e "s/export AWS_PROFILE=.*/export AWS_PROFILE=$selected_profile/" "$HOME/.bashrc"
+				else
+					# append the export statement to .bashrc
+					echo "export AWS_PROFILE=$selected_profile" >> "$HOME/.bashrc"
+				fi
+			fi
+		fi
 	fi
 
 	# source the .bashrc file to apply changes in the current session
@@ -158,7 +192,21 @@ add_host() {
     local host_user_IP=$2
 
     # Add host to the specified group
-    sed -i "/^\[$group\]/a $host_name = $host_user_IP" "$CONFIG_FILE"
+	# Check if OS is Darwin (macOS) or Linux
+	if [ "$OS" = "Darwin" ]; then
+		# macOS specific sed command
+		sed -i '' "/^\[$group\]/a\\
+$host_name = $host_user_IP" "$CONFIG_FILE"
+	elif [ "$OS" = "Linux" ]; then
+		# Check if we are on Ubuntu or Debian
+		if [ -f /etc/os-release ]; then
+			. /etc/os-release
+			if [ "$ID" = "ubuntu" ] || [ "$ID" = "debian" ]; then
+				# Ubuntu or Debian specific sed command
+				sed -i "/^\[$group\]/a $host_name = $host_user_IP" "$CONFIG_FILE"
+			fi
+		fi
+	fi
     echo -e "\nHost added to $group group (make sure to add your public key to the host authorized_keys file)"
 }
 
@@ -190,7 +238,19 @@ del_group() {
 		exit 1
 	else
 		echo "Deleting $group..."
-		sed -i "/^\[$group\]/,/^\[.*\]/d" "$CONFIG_FILE"
+
+		if [ "$OS" = "Darwin" ]; then
+			# macOS specific sed command
+			sed -i '' "/^\[$group\]/,/^\[.*\]/d" "$CONFIG_FILE"
+		elif [ "$OS" = "Linux" ]; then
+			# Check if we are on Ubuntu or Debian
+			if [ -f /etc/os-release ]; then
+				. /etc/os-release
+				if [ "$ID" = "ubuntu" ] || [ "$ID" = "debian" ]; then
+					sed -i "/^\[$group\]/,/^\[.*\]/d" "$CONFIG_FILE"
+				fi
+			fi
+		fi
 		echo "Group $group deleted."
 	fi
 }
@@ -201,7 +261,18 @@ del_host(){
 	# Return if no entry is selected.
 	# [[ -n $PH_NAME ]] || return 0
 	echo -e "Deleting ${PH_NAME}...\n"
-	sed -i "/$PH_NAME/d" "$CONFIG_FILE"
+	if [ "$OS" = "Darwin" ]; then
+		# macOS specific sed command
+		sed -i '' "/$PH_NAME/d" "$CONFIG_FILE"
+	elif [ "$OS" = "Linux" ]; then
+		# Check if we are on Ubuntu or Debian
+		if [ -f /etc/os-release ]; then
+			. /etc/os-release
+			if [ "$ID" = "ubuntu" ] || [ "$ID" = "debian" ]; then
+				sed -i "/$PH_NAME/d" "$CONFIG_FILE"
+			fi
+		fi
+	fi
 	echo "Host $PH_NAME deleted."
 }
 
@@ -271,7 +342,7 @@ elif [ "$1" == "host" ] && [ "$2" == "add" ]; then
 		exit 1
 	fi
 elif [ "$1" == "host" ] && [ "$2" == "edit" ]; then
-	code $CONFIG_FILE
+	code "$CONFIG_FILE"
 elif [ "$1" == "host" ] && [ "$2" == "help" ]; then
 	echo "Usage: pick.sh host {add | edit | help}"]
 elif [ "$1" == "host" ] && [ "$2" == "remove" ]; then
