@@ -102,7 +102,7 @@ No special installation is required for the script itself, but ensure that all p
 ### General Syntax
 
 ```css
-./script.sh [option] [arguments]
+./killr.sh [option] [arguments]
 ```
 
 ### Options
@@ -126,19 +126,19 @@ No special installation is required for the script itself, but ensure that all p
 * To kill the process using port 8080:
     
     ```bash
-    ./script.sh port 8080
+    ./killr.sh port 8080
     ```
     
 * To kill the most CPU-intensive process:
     
     ```bash
-    ./script.sh res cpu
+    ./killr.sh res cpu
     ```
     
 * To remove the last created Docker image:
     
     ```bash
-    ./script.sh dock --last
+    ./killr.sh dock --last
     ```
 
 ## Testing
