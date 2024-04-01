@@ -164,8 +164,17 @@ add_host() {
 
 add_group() {
 	local group=$1
+	# Check if the file does not exist
+	if [ ! -f "$CONFIG_FILE" ]; then
+		# Create the directory - it won't do anything if the directory already exists
+		mkdir -p "$(dirname "$CONFIG_FILE")"
+		
+		# Create the file
+		touch "$CONFIG_FILE"
+	fi
 	# Check if the group exists, if not create it
 	if ! grep -q "\[$group\]" "$CONFIG_FILE"; then
+		# Now append to the file
 		echo -e "\n[$group]" >> "$CONFIG_FILE"
 		echo "Group $group created."
 	else
