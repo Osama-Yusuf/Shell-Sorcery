@@ -1,5 +1,5 @@
 # // Function to select a host for sshing into based on the entries in the ~/.config/pickhost/hosts file.
-host_selector() {
+ssh_host() {
 	# pickhost an opensource project for sshing into hosts & this where you write your hosts ~/.config/pickhost/hosts and is better than using fzf with .ssh/host like above
     unset PH_NAME PH_USER PH_HOST
     eval $(pickhost 2>&1 >/dev/tty)
@@ -7,7 +7,35 @@ host_selector() {
     [[ -n $PH_NAME ]] || return 0
     echo -e "Logging into ${PH_NAME}...\n"
     ssh ${PH_USER}@${PH_HOST}
-    # echo "ssh ${PH_USER}@${PH_HOST}"
+}
+
+scp_host() {
+	# check if three args were giving
+	if [ $# -ne 3 ]; then
+		echo "Usage: pick.sh host scp {to | from} {source} {destination}"
+		exit 1
+	fi
+
+	# pickhost an opensource project for sshing into hosts & this where you write your hosts ~/.config/pickhost/hosts and is better than using fzf with .ssh/host like above
+	unset PH_NAME PH_USER PH_HOST
+	eval $(pickhost 2>&1 >/dev/tty)
+	# Return if no entry is selected.
+	[[ -n $PH_NAME ]] || return 0
+	
+    local to_or_from=$1
+    local source=$2
+    local destination=$3
+
+	if [ "$to_or_from" = "to" ]; then
+		echo -e "Copying ${PH_NAME}...\n"
+		scp ${source} ${PH_USER}@${PH_HOST}:${destination}
+	elif [ "$to_or_from" = "from" ]; then
+		echo -e "Copying ${PH_NAME}...\n"
+		scp ${PH_USER}@${PH_HOST}:${source} ${destination}
+	else
+		echo "Usage: pick.sh host scp {to | from} {source} {destination}"
+		exit 1
+	fi
 }
 
 # Function to list and select a group using fzf

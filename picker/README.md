@@ -48,6 +48,8 @@ The script can be executed with various commands and options:
 * `ns`: Manage Kubernetes namespaces
     * `cur`: Show current namespace
 * `host`: SSH host management
+    * Without any option you will select a host to ssh in
+    * `scp`: Securly copy files from local to host and vice versa
     * `add`: Add a new host or group
     * `edit`: Edit the hosts file in VS Code
     * `remove`: Remove an existing host or group

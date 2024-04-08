@@ -134,9 +134,12 @@ elif [ "$1" == "host" ] && [ "$2" == "remove" ]; then
 		echo "Usage: pick.sh host remove {group | host}"
 		exit 1
 	fi
+elif [ "$1" == "host" ] && [ "$2" == "scp" ]; then
+	pickhost_checker
+	scp_host "$3" "$4" "$5"
 elif [ "$1" == "host" ]; then
 	pickhost_checker
-	host_selector
+	ssh_host
 else
 	echo "Usage: pick.sh {command}
 
@@ -164,6 +167,12 @@ ns
 host
    - Pick a host to SSH into
    Subcommands:
+    scp
+		- Copy files from or to a host
+		Options:
+			to/from - Copy to or from a host
+			source - Source file
+			destination - Destination path
 	add
 		- Adds a new host or group
 		Options:
