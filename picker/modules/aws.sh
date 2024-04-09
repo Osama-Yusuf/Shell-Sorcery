@@ -57,3 +57,8 @@ aws_selector() {
 		$SHELL
 	fi
 }
+
+aws_editor() {
+	# get the AWS editor
+	code "$HOME/.aws"
+}

@@ -77,6 +77,11 @@ then
 		echo $AWS_PROFILE
 		exit 1
 	fi
+	if [ "$2" == "edit" ]
+	then
+		aws_editor
+		exit 1
+	fi
 	fzf_checker
 	aws_selector
 elif [ "$1" == "ns" ]
@@ -160,6 +165,8 @@ eks
 aws
    - Pick an AWS profile from "$HOME/.aws/credentials" as the default.
    Subcommands:
+	edit
+		- Edit the current AWS configuration file
 	cur
 		- Shows the current AWS profile
 
