@@ -143,6 +143,7 @@ elif [ "$1" == "host" ] && [ "$2" == "scp" ]; then
 	# check if three args were giving
 	if [ $# -ne 5 ]; then
 		echo "Usage: pick.sh host scp {to | from} {source} {destination}"
+echo "from=from host & to=to host"
 		exit 1
 	fi
 	pickhost_checker

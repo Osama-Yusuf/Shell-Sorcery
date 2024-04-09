@@ -13,6 +13,7 @@ scp_host() {
 	# check if three args were giving
 	if [ $# -ne 3 ]; then
 		echo "Usage: pick.sh host scp {to | from} {source} {destination}"
+		echo "from=from host & to=to host"
 		exit 1
 	fi
 
@@ -34,6 +35,7 @@ scp_host() {
 		scp ${PH_USER}@${PH_HOST}:${source} ${destination}
 	else
 		echo "Usage: pick.sh host scp {to | from} {source} {destination}"
+		echo "from=from host & to=to host"
 		exit 1
 	fi
 }
