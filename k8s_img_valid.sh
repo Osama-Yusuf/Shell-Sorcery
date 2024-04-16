@@ -11,7 +11,7 @@ echo "Please select a namespace "
 select chosen_namespace in "${namespaces_array[@]}"; do
     # Check if a namespace was selected
     if [[ -n "$chosen_namespace" ]]; then
-        echo -e "\nYou have selected $chosen_namespace namespace\n"
+        echo -e "\nYou have selected $chosen_namespace namespace"
         break # Break the loop if selection is valid
     else
         echo "invalid" # Indicate invalid selection
