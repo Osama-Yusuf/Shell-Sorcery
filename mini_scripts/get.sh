@@ -34,10 +34,9 @@ link() {
 push() {
     current_branch=$(git branch | awk '{print $2}')
     current_remote_name=$(git remote -v | awk 'NR==1{print $1}')
-    # check if user passed commit message start with positive condition
-    if [ $# -gt 0 ]; then
+    if [ $# -gt 1 ]; then
         commit_message=$*
-        # The first argument will be there in the commit we need to remove it
+        # The first argument(push) will be there in the commit we need to remove it
         commit_message=${commit_message:5}
         echo -e "Commit message: "$commit_message"\n"
         echo -e "You are currently in: ${PWD}."

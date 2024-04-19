@@ -22,8 +22,10 @@ To use this script, you must have Git installed on your machine. Here are the co
 
 - **Push Changes**:
 Run the script with `push` followed by your commit message to add, commit, and push changes to the current branch of your repository.
-
+You can type your commit message with/without quotation marks
 ``` bash
+get push Your commit message here
+# Or like this as well
 get push "Your commit message here"
 ```
 

@@ -179,8 +179,10 @@ To use this script, you must have Git installed on your machine. Here are the co
 
 - **Push Changes**:
 Run the script with `push` followed by your commit message to add, commit, and push changes to the current branch of your repository.
-
+You can type your commit message with/without quotation marks
 ``` bash
+get push Your commit message here
+# Or like this as well
 get push "Your commit message here"
 ```
 
@@ -219,6 +221,11 @@ To use this script, you need Python 3 installed on your machine. Follow these st
 
 3. **Monitor Output**:
    - The script prints messages to the console as it finds and deletes `node_modules` directories.
+
+### ToDo
+
+- [ ] Add folder passing as an argument and if not passed use the default hard codded value in the script
+- [ ] Prompt the user before changing any file/dirs permissions
 
 ### Note:
 Be cautious with the directories you target for cleaning as this script will delete all contents of any `node_modules` directory it finds, which might affect project dependencies if not intended for deletion.
