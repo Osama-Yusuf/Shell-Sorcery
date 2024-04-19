@@ -29,10 +29,10 @@ scp_host() {
 
 	if [ "$to_or_from" = "to" ]; then
 		echo -e "Copying ${PH_NAME}...\n"
-		scp ${source} ${PH_USER}@${PH_HOST}:${destination}
+		scp -r ${source} ${PH_USER}@${PH_HOST}:${destination}
 	elif [ "$to_or_from" = "from" ]; then
 		echo -e "Copying ${PH_NAME}...\n"
-		scp ${PH_USER}@${PH_HOST}:${source} ${destination}
+		scp -r ${PH_USER}@${PH_HOST}:${source} ${destination}
 	else
 		echo "Usage: pick.sh host scp {to | from} {source} {destination}"
 		echo "from=from host & to=to host"

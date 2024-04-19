@@ -25,14 +25,17 @@ Killer provides tools to manage system resources, including processes and Docker
 
 ## Installation
 
-No special installation is required for the script itself, but ensure that all prerequisite tools are installed on your system.
+```bash
+# 1. Make the script executable by running:
+chmod +x killr.sh
+# 2. Copy it to your bin dir
+sudo cp killr.sh /usr/local/bin/kil
+```
 
 ## Usage
 
-### General Syntax
-
-```css
-./killr.sh [option] [arguments]
+```bash
+kil [option] [arguments]
 ```
 
 ### Options
@@ -56,19 +59,19 @@ No special installation is required for the script itself, but ensure that all p
 * To kill the process using port 8080:
     
     ```bash
-    ./killr.sh port 8080
+    kil port 8080
     ```
     
 * To kill the most CPU-intensive process:
     
     ```bash
-    ./killr.sh res cpu
+    kil res cpu
     ```
     
 * To remove the last created Docker image:
     
     ```bash
-    ./killr.sh dock --last
+    kil dock --last
     ```
 
 ## Testing
