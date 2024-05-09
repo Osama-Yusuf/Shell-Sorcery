@@ -1,0 +1,1 @@
+jinja2 -D image_name=nginxxxx template.j2.yaml > test.yaml
