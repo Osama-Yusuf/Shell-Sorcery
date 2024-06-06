@@ -47,13 +47,25 @@ push() {
     fi
 }
 
+pull() {
+    current_branch=$(git branch | awk '{print $2}')
+    current_remote_name=$(git remote -v | awk 'NR==1{print $1}')
+    echo "Pulling updates from $current_remote_name/$current_branch..."
+    git pull $current_remote_name $current_branch
+}
+
 if [ "$1" == "push" ]; then
     check_git_init
     push $*
 elif [ "$1" == "link" ]; then
     check_git_init
     link
+elif [ "$1" == "pull" ]; then
+    check_git_init
+    pull
 else
-    echo "Usage: get.sh {push | link}"
-    exit 1
+    git status
+    echo
+    echo "Usage: get.sh {push | link | pull}"
+    # exit 1
 fi
