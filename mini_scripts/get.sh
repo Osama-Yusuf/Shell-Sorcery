@@ -39,7 +39,7 @@ push() {
         # The first argument(push) will be there in the commit we need to remove it
         commit_message=${commit_message:5}
         echo -e "Commit message: "$commit_message"\n"
-        echo -e "You are currently in: ${PWD}."
+        echo -e "You are currently in: ${PWD}. ${current_remote_name}/${current_branch}"
         read -p "Press Enter to continue or CTRL+C to abort..."
         git add . && git commit -m "$commit_message" && git push $current_remote_name $current_branch
     else
