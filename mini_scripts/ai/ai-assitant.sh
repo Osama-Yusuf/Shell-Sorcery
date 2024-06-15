@@ -6,13 +6,22 @@ if [ $# -lt 4 ]; then
     exit 1
 fi
 
+# for e.g. these are types of wisdom and tutorial vids to pass
+# wisdom linke= https://youtu.be/pdJQ8iVTwj8
+# tutorial link= https://youtu.be/bp2eev21Qfo 
+
 # Initialize default LLM
 default_llm="llama3"
 
 # Define patterns as variables
-wisdom="summery of that meeting ideas out of that meeting to help me improve, topics of that meeting, keypoints, keywords, insights out of that meeting to help me improve, quotes out of that meeting to help me improve, habits out of that meeting to do to be a better person, hot takes, inspiration, discussion questions"
+wisdom="Summary of the meeting, key ideas, topics discussed, main points, essential keywords, valuable insights for improvement, impactful quotes, recommended habits for personal growth, notable opinions, sources of inspiration, and discussion questions"
 
-tutorial="give a simplified and detailed well formatted step-by-step tutorial/commands on how to achieve this tutorial transcript goal in a cool and interactive way and add additional tips. and how to make it better and improve it. and your opinion on the subject. and if there's a better alternative"
+# wisdom_old="summery of that meeting ideas out of that meeting to help me improve, topics of that meeting, keypoints, keywords, insights out of that meeting to help me improve, quotes out of that meeting to help me improve, habits out of that meeting to do to be a better person, hot takes, inspiration, discussion questions"
+
+
+tutorial="Provide a clear, detailed, step-by-step guide with commands for achieving this tutorial's objectives. Format it in an engaging and interactive manner. Include additional tips for enhancement and your insights on improving the tutorial. Share your perspective on the topic and suggest any superior alternatives if available"
+
+# tutorial_old="give a simplified and detailed well formatted step-by-step tutorial/commands on how to achieve this tutorial transcript goal in a cool and interactive way and add additional tips. and how to make it better and improve it. and your opinion on the subject. and if there's a better alternative"
 
 
 if [ "$1" == "-yt" ]; then
@@ -65,5 +74,5 @@ command="yt --transcript '$youtube_url' | ollama run $llm \"$pattern_value\""
 # echo "pattern value: $pattern_value"
 # echo "llm: $llm"
 # echo "Executing: $command"
-
+clear
 eval $command
