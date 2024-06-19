@@ -65,6 +65,7 @@ elif [ "$1" == "pull" ]; then
     pull
 else
     git fetch
+    echo
     git status
     echo
     echo "Usage: get.sh {push | link | pull}"
