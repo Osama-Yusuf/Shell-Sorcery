@@ -36,27 +36,49 @@ create_venv() {
 remove_venv() {
     # Remove the virtual environment directory
     if [[ -d "$venv_name" ]]; then
-        echo "Execute the following commands to remove the virtual environment:\n"
-        echo "deactivate"
-        echo "rm -rf $venv_name"
+        clipboard_cmd=$(get_clipboard_command)
+        if [ "$clipboard_cmd" = "Unsupported OS for clipboard copying" ]; then
+            echo -e "Clipboard copying is not supported on this OS.\n"
+            echo "Please copy paste the following command in your terminal to remove the virtual environment."
+            echo "deactivate && rm -rf $venv_name"
+        else
+            echo "deactivate && rm -rf $venv_name" | $clipboard_cmd
+            echo "CMD copied to clipboard."
+            echo "Please paste it in your terminal to remove the virtual environment."
+        fi
     else
         echo "Virtual environment '$venv_name' does not exist."
     fi
 }
 
+create_requirements() {
+    pip3 freeze > requirements.txt
+    echo "Requirements file 'requirements.txt' created."
+}
+
+# Add 'i' argument to install requirements of current dir
+install_requirements() {
+    pip3 install -r requirements.txt
+    echo "Requirements installed from 'requirements.txt'."
+}
+
 # Check the arguments
 if [[ $# -eq 0 ]]; then
-    echo "Usage: $0 [-c | -r]"
+    echo "Usage: $0 [-c | -r | -f | -i]"
     echo "  -c : Create the virtual environment"
     echo "  -r : Remove the current virtual environment"
+    echo "  -f : Create requirements file"
+    echo "  -i : Install requirements from file"
     exit 1
 fi
 
 # Parse the arguments
-while getopts "cr" option; do
+while getopts "crfi" option; do
     case $option in
         c) create_venv ;;
         r) remove_venv ;;
+        f) create_requirements ;;
+        i) install_requirements ;;
         *) echo "Invalid option"; exit 1 ;;
     esac
 done
