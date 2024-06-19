@@ -64,8 +64,7 @@ elif [ "$1" == "pull" ]; then
     check_git_init
     pull
 else
-    git fetch
-    echo
+    git fetch > /dev/null 2>&1
     git status
     echo
     echo "Usage: get.sh {push | link | pull}"
