@@ -20,7 +20,7 @@ get_clipboard_command() {
 # Function to create the virtual environment
 create_venv() {
     # Create the virtual environment
-    python3 -m venv "$venv_name"
+    python3.12 -m venv "$venv_name"
     echo "Virtual environment '$venv_name' created."
     clipboard_cmd=$(get_clipboard_command)
     if [ "$clipboard_cmd" = "Unsupported OS for clipboard copying" ]; then
