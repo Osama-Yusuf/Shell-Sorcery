@@ -7,13 +7,13 @@ get_clipboard_command() {
     case "$(uname)" in
         "Linux")
             echo "xclip -selection clipboard"  # Debian-based systems like Ubuntu
-            ;;
+        ;;
         "Darwin")
             echo "pbcopy"  # macOS uses pbcopy
-            ;;
+        ;;
         *)
             echo "Unsupported OS for clipboard copying"
-            ;;
+        ;;
     esac
 }
 
@@ -62,21 +62,40 @@ install_requirements() {
     echo "Requirements installed from 'requirements.txt'."
 }
 
+activate_venv() {
+    if [[ -d "$venv_name" ]]; then
+        clipboard_cmd=$(get_clipboard_command)
+        if [ "$clipboard_cmd" = "Unsupported OS for clipboard copying" ]; then
+            echo -e "Clipboard copying is not supported on this OS.\n"
+            echo "Please copy paste the following command in your terminal to activate the virtual environment."
+            echo "source $venv_name/bin/activate"
+        else
+            echo "source $venv_name/bin/activate" | $clipboard_cmd
+            echo "CMD copied to clipboard."
+            echo "Please paste it in your terminal to activate the virtual environment."
+        fi
+    else
+        echo "Virtual environment '$venv_name' does not exist."
+    fi
+}
+
 # Check the arguments
 if [[ $# -eq 0 ]]; then
-    echo "Usage: $0 [-c | -r | -f | -i]"
+    echo "Usage: $0 [-c | -r | -f | -i | -a]"
     echo "  -c : Create the virtual environment"
     echo "  -r : Remove the current virtual environment"
+    echo "  -a : Activate the current virtual environment"
     echo "  -f : Create requirements file"
     echo "  -i : Install requirements from file"
     exit 1
 fi
 
 # Parse the arguments
-while getopts "crfi" option; do
+while getopts "crafi" option; do
     case $option in
         c) create_venv ;;
         r) remove_venv ;;
+        a) activate_venv ;;
         f) create_requirements ;;
         i) install_requirements ;;
         *) echo "Invalid option"; exit 1 ;;
