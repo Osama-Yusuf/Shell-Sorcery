@@ -15,6 +15,10 @@ pod_names() {
     chosen_namespace=$1
     POD=$2
     DEPLOY_NAME=$(kubectl get deploy -n ${chosen_namespace} | grep "\b${POD}\b" | awk '{print $1}')
+    if [ -z "$DEPLOY_NAME" ]; then
+        echo "No deployment found for $POD"
+        exit 1
+    fi
     RS_NAME=`kubectl describe deployment $DEPLOY_NAME -n ${chosen_namespace} | grep "^NewReplicaSet"|awk '{print $2}'`
     POD_HASH_LABEL=`kubectl get rs $RS_NAME -n ${chosen_namespace} -o jsonpath="{.metadata.labels.pod-template-hash}"`
     POD_NAMES=`kubectl get pods -n ${chosen_namespace} -l pod-template-hash=$POD_HASH_LABEL --show-labels | tail -n +2 | awk '{print $1}'`
@@ -77,7 +81,10 @@ no_args_passed() {
     # Retrieve a list of deployments from Kubernetes and store them in an array
     microservices=$(kubectl get deployments -n $chosen_namespace -o=jsonpath='{.items[*].metadata.name}')
     IFS=' ' read -r -a microservices_array <<< "$microservices"
-
+    if [[ ${#microservices_array[@]} -eq 0 ]]; then
+        echo "No microservices found in the $chosen_namespace namespace"
+        exit 1
+    fi
     # Process each microservice to cut by "-"
     for i in "${!microservices_array[@]}"; do
         microservices_array[i]="${microservices_array[i]%%-*}"
