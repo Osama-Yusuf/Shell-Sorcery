@@ -57,7 +57,7 @@ no_args_passed() {
     namespaces=$(kubectl get namespace -o=jsonpath='{.items[*].metadata.name}')
     IFS=' ' read -r -a namespaces_array <<< "$namespaces"
 
-    if command -v fzfs &> /dev/null; then
+    if command -v fzf &> /dev/null; then
         # Use fzf for namespace selection
         chosen_namespace=$(printf "%s\n" "${namespaces_array[@]}" | fzf --multi --cycle --reverse --height 10% --border --prompt "Select a namespace: " --preview "echo {}" --preview-window down:1:wrap)
         if [[ -z "$chosen_namespace" ]]; then
@@ -90,7 +90,7 @@ no_args_passed() {
         microservices_array[i]="${microservices_array[i]%%-*}"
     done
 
-    if command -v fzfs &> /dev/null; then
+    if command -v fzf &> /dev/null; then
         # Use fzf for microservice selection
         microservice=$(printf "%s\n" "${microservices_array[@]}" | fzf --multi --cycle --reverse --height 10% --border --prompt "Select a microservice: " --preview "echo {}" --preview-window down:1:wrap)
         if [[ -z "$microservice" ]]; then
