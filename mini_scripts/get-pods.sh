@@ -2,8 +2,57 @@
 
 show_help() {
     echo "Usage: $0 <namespace> <microservice>"
-    echo "Example: $0 dev books"
-    echo "Please provide two arguments."
+    echo "Usage: $0 <namespace> <microservice> <get || logs || describe>"
+    echo
+    echo -e "Example: $0 dev books\nThis will list all book pods in the dev namespace\n"
+    echo -e "Example: $0 dev books logs\nThis will log the first book pod in the dev namespace\n"
+    echo -e "Example: $0 dev books describe\nThis will describe the first book pod in the dev namespace"
+    echo
+    echo "Please provide at least two or three arguments."
+}
+
+pod_names() {
+    chosen_namespace=$1
+    # microservice is below renamed to POD
+    POD=$2
+    DEPLOY_NAME=$(kubectl get deploy -n ${chosen_namespace} | grep "\b${POD}\b" | awk '{print $1}')
+    RS_NAME=`kubectl describe deployment $DEPLOY_NAME -n ${chosen_namespace} | grep "^NewReplicaSet"|awk '{print $2}'`
+    POD_HASH_LABEL=`kubectl get rs $RS_NAME -n ${chosen_namespace} -o jsonpath="{.metadata.labels.pod-template-hash}"`
+    POD_NAMES=`kubectl get pods -n ${chosen_namespace} -l pod-template-hash=$POD_HASH_LABEL --show-labels | tail -n +2 | awk '{print $1}'`
+    UNFILTERED_DEPLOY_NAME=$(kubectl get deploy -n ${chosen_namespace} | grep "\b${POD}\b")
+    # echo "----"
+    # echo "Showing $POD deployment:"
+    # echo $UNFILTERED_DEPLOY_NAME
+    # echo "----"
+    # echo "Showing $POD pods:"
+}
+
+first_pod_name() {
+    chosen_namespace=$1
+    microservice=$2
+    # select a pod from POD_HASH_LABEL list
+    pod_names "$chosen_namespace" "$microservice"
+    first_pod_name=$(kubectl get pods -n $chosen_namespace | grep $POD_HASH_LABEL | awk 'NR==1{print $1}')
+}
+
+get_pods() {
+    chosen_namespace=$1
+    microservice=$2
+    pod_names "$chosen_namespace" "$microservice"
+    kubectl get pods -n $chosen_namespace | grep $POD_HASH_LABEL
+    echo
+}
+
+log_pod() {
+    chosen_namespace=$1
+    microservice=$2
+    first_pod_name "$chosen_namespace" "$microservice"
+    kubectl logs -n $chosen_namespace $first_pod_name
+}
+
+describe_pod() {
+    first_pod_name "$chosen_namespace" "$microservice"
+    kubectl describe pod -n $chosen_namespace $first_pod_name
 }
 
 no_args_passed() {
@@ -48,21 +97,48 @@ no_args_passed() {
             echo "invalid" # Indicate invalid selection
         fi
     done
-}
 
-logic() {
-    # Retrieve a list of pods from the selected namespace that match the microservice name
-    kubectl get pods -n $chosen_namespace | grep $microservice
+    get_pods "$chosen_namespace" "$microservice"
+
+    # After showing the pods, ask if the user wants another operation like logs or describe
+    echo -e "\nDo you want to perform another operation? (e.g., logs, describe)"
+    read -p "Enter the operation you want to perform: " operation
+
+    # Check the user's choice and execute the corresponding operation
+    case $operation in
+        logs)
+            # Call a function to show logs
+            log_pod "$chosen_namespace" "$microservice"
+            ;;
+        describe)
+            # Call a function to describe the selected pod
+            describe_pod "$chosen_namespace" "$microservice"
+            ;;
+        *)
+            echo "Invalid operation. Exiting."
+            ;;
+    esac
 }
 
 main() {
     if [ "$#" -eq 0 ]; then
         no_args_passed
-        logic
     elif [ "$#" -eq 2 ]; then
         chosen_namespace=$1
         microservice=$2
-        logic "$chosen_namespace" "$microservice"
+        get_pods "$chosen_namespace" "$microservice"
+    elif [ "$#" -eq 3 ]; then
+        chosen_namespace=$1
+        microservice=$2
+        if [ "$3" == "get" ]; then
+            get_pods "$chosen_namespace" "$microservice"
+        elif [ "$3" == "logs" ]; then
+            log_pod "$chosen_namespace" "$microservice"
+        elif [ "$3" == "describe" ]; then
+            describe_pod "$chosen_namespace" "$microservice"
+        else
+            show_help
+        fi
     else
         show_help
     fi
