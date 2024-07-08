@@ -1,14 +1,27 @@
 #!/bin/bash
 
 show_help() {
+    echo "Usage: $0"
     echo "Usage: $0 <namespace> <microservice>"
-    echo "Usage: $0 <namespace> <microservice> <get || logs || describe>"
+    echo "Usage: $0 <namespace> <microservice> <get || logs || describe || exec || delete || envs>"
     echo
     echo -e "Example: $0 dev books\nThis will list all book pods in the dev namespace\n"
     echo -e "Example: $0 dev books logs\nThis will log the first book pod in the dev namespace\n"
-    echo -e "Example: $0 dev books describe\nThis will describe the first book pod in the dev namespace"
-    echo
-    echo "Please provide at least two or three arguments."
+    echo -e "Example: $0 dev books describe\nThis will describe the first book pod in the dev namespace\n"
+    echo -e "Example: $0 dev books exec\nThis will exec into the first book pod in the dev namespace\n"
+    echo -e "Example: $0 dev books delete\nThis will delete the book pods in the dev namespace one by one, only when the user confirms with yes\n"
+    echo -e "Example: $0 dev books delete --auto-approve\nThis will delete the book pods in the dev namespace one by one, without user confirmation\n"
+    echo -e "Example: $0 dev books envs\nThis will show environment variables of the first book pod in the dev namespace\n"
+    echo -e "Example: $0 dev books envs VAR_NAME\nThis will show environment variables containing VAR_NAME of the first book pod in the dev namespace"
+}
+
+# check if the above command successeded if not exit
+check_success() {
+    if [ $? -ne 0 ]; then
+        echo -e "$1\n"
+        show_help
+        exit 1
+    fi
 }
 
 pod_names() {
@@ -19,9 +32,9 @@ pod_names() {
         echo "No deployment found for $POD"
         exit 1
     fi
-    RS_NAME=`kubectl describe deployment $DEPLOY_NAME -n ${chosen_namespace} | grep "^NewReplicaSet"|awk '{print $2}'`
-    POD_HASH_LABEL=`kubectl get rs $RS_NAME -n ${chosen_namespace} -o jsonpath="{.metadata.labels.pod-template-hash}"`
-    POD_NAMES=`kubectl get pods -n ${chosen_namespace} -l pod-template-hash=$POD_HASH_LABEL --show-labels | tail -n +2 | awk '{print $1}'`
+    RS_NAME=$(kubectl describe deployment $DEPLOY_NAME -n ${chosen_namespace} | grep "^NewReplicaSet" | awk '{print $2}')
+    POD_HASH_LABEL=$(kubectl get rs $RS_NAME -n ${chosen_namespace} -o jsonpath="{.metadata.labels.pod-template-hash}")
+    POD_NAMES=$(kubectl get pods -n ${chosen_namespace} -l pod-template-hash=$POD_HASH_LABEL --show-labels | tail -n +2 | awk '{print $1}')
     UNFILTERED_DEPLOY_NAME=$(kubectl get deploy -n ${chosen_namespace} | grep "\b${POD}\b")
 }
 
@@ -50,6 +63,45 @@ log_pod() {
 describe_pod() {
     first_pod_name "$chosen_namespace" "$microservice"
     kubectl describe pod -n $chosen_namespace $first_pod_name
+}
+
+exec_pod() {
+    first_pod_name "$chosen_namespace" "$microservice"
+    kubectl exec -it -n $chosen_namespace $first_pod_name -- sh
+}
+
+delete_pod() {
+    chosen_namespace=$1
+    microservice=$2
+    auto_approve=$3
+    pod_names "$chosen_namespace" "$microservice"
+
+    echo "The following pods will be deleted one by one in the $chosen_namespace namespace:"
+    echo "$POD_NAMES"
+    echo
+
+    if [ "$auto_approve" != "--auto-approve" ]; then
+        read -p "Are you sure you want to delete these pods? (yes/no): " confirm
+        if [[ "$confirm" != "yes" ]]; then
+            echo "Aborting deletion."
+            exit 1
+        fi
+    fi
+
+    for pod in $POD_NAMES; do
+        echo "Deleting pod $pod..."
+        kubectl delete pod -n $chosen_namespace $pod >/dev/null
+        echo "Pod $pod has been deleted."
+    done
+}
+
+envs_pod() {
+    first_pod_name "$chosen_namespace" "$microservice"
+    if [ -z "$3" ]; then
+        kubectl exec -n $chosen_namespace $first_pod_name -- printenv
+    else
+        kubectl exec -n $chosen_namespace $first_pod_name -- printenv | grep -i "$3"
+    fi
 }
 
 no_args_passed() {
@@ -104,7 +156,7 @@ no_args_passed() {
             if [[ -n "$microservice" ]]; then
                 break
             else
-                echo "invalid"
+                false || check_success "invalid input $REPLY"
             fi
         done
     fi
@@ -113,8 +165,8 @@ no_args_passed() {
 
     get_pods "$chosen_namespace" "$microservice"
 
-    # After showing the pods, ask if the user wants another operation like logs or describe
-    echo -e "Do you want to perform another operation? (e.g., logs, describe)"
+    # After showing the pods, ask if the user wants another operation like logs, describe, exec, delete, or envs
+    echo -e "Do you want to perform another operation? (e.g., logs, describe, exec, delete, envs)"
     read -p "Enter the operation you want to perform: " operation
     echo 
 
@@ -126,8 +178,18 @@ no_args_passed() {
         describe)
             describe_pod "$chosen_namespace" "$microservice"
             ;;
+        exec)
+            exec_pod "$chosen_namespace" "$microservice"
+            ;;
+        delete)
+            delete_pod "$chosen_namespace" "$microservice"
+            ;;
+        envs)
+            read -p "Enter the variable name to filter by (optional): " var_name
+            envs_pod "$chosen_namespace" "$microservice" "$var_name"
+            ;;
         *)
-            echo "Invalid operation. Exiting."
+            false || check_success "Invalid operation. Exiting."
             ;;
     esac
 }
@@ -142,17 +204,39 @@ main() {
     elif [ "$#" -eq 3 ]; then
         chosen_namespace=$1
         microservice=$2
-        if [ "$3" == "get" ]; then
-            get_pods "$chosen_namespace" "$microservice"
-        elif [ "$3" == "logs" ]; then
-            log_pod "$chosen_namespace" "$microservice"
-        elif [ "$3" == "describe" ]; then
-            describe_pod "$chosen_namespace" "$microservice"
-        else
-            show_help
-        fi
+        case $3 in
+            get)
+                get_pods "$chosen_namespace" "$microservice"
+                ;;
+            logs)
+                log_pod "$chosen_namespace" "$microservice"
+                ;;
+            describe)
+                describe_pod "$chosen_namespace" "$microservice"
+                ;;
+            exec)
+                exec_pod "$chosen_namespace" "$microservice"
+                ;;
+            delete)
+                delete_pod "$chosen_namespace" "$microservice"
+                ;;
+            envs)
+                envs_pod "$chosen_namespace" "$microservice"
+                ;;
+            *)
+                false || check_success "Invalid operation. Exiting."
+                ;;
+        esac
+    elif [ "$#" -eq 4 ] && [ "$3" == "envs" ]; then
+        chosen_namespace=$1
+        microservice=$2
+        envs_pod "$chosen_namespace" "$microservice" "$4"
+    elif [ "$#" -eq 4 ] && [ "$3" == "delete" ]; then
+        chosen_namespace=$1
+        microservice=$2
+        delete_pod "$chosen_namespace" "$microservice" "$4"
     else
-        show_help
+        check_success "Invalid number of arguments. Exiting."
     fi
 }
 
