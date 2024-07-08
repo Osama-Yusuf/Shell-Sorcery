@@ -82,7 +82,7 @@ This script helps you manage Kubernetes pods in a specific namespace. You can li
     ./script.sh dev books delete
     ```
     
-    This command deletes the `books` pods in the `dev` namespace one by one, with user confirmation required for each pod.
+    This command deletes the `books` pods in the `dev` namespace one by one, only when the user confirms with yes.
     
 6. **Delete pods of a microservice in a namespace one by one without confirmation:**
     
