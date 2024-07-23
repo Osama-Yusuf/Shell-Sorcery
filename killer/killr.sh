@@ -86,11 +86,41 @@ function handle_res() {
         echo "Invalid argument. Please use 'cpu' or 'mem'."
     fi
 }
+# Function to check if Docker or Podman is installed and available
+check_container_tool() {
+    if command -v docker &> /dev/null; then
+        docker ps &> /dev/null
+        if [ $? -eq 0 ]; then
+            echo "docker"
+            return 0
+        fi
+    fi
+
+    if command -v podman &> /dev/null; then
+        podman ps &> /dev/null
+        if [ $? -eq 0 ]; then
+            echo "podman"
+            return 0
+        fi
+    fi
+
+    echo "none"
+    return 1
+}
 
 # Function for handling dock argument
 function handle_dock() {
     local args=("$@")
     local option=$1
+
+    # Determine the container tool to use
+    local container_tool=$(check_container_tool)
+    if [ "$container_tool" == "none" ]; then
+        echo "Neither Docker nor Podman is installed or accessible on this machine."
+        return 1
+    # else
+    #     echo "Using $container_tool"
+    fi
 
     # Help message for Docker-related operations
     if [ -z "$option" ] || [ "$option" == "-h" ] || [ "$option" == "--help" ]; then
@@ -113,9 +143,9 @@ function handle_dock() {
         local selected
 
         if [ "$mode" == "image" ]; then
-            selected=$(docker images | grep -v REPOSITORY | fzf --height 40% --border --ansi | awk '{print $3}')
+            selected=$($container_tool images | grep -v REPOSITORY | fzf --height 40% --border --ansi | awk '{print $3}')
         elif [ "$mode" == "container" ]; then
-            selected=$(docker ps -a | grep -v "CONTAINER ID" | fzf --height 40% --border --ansi | awk '{print $1}')
+            selected=$($container_tool ps -a | grep -v "CONTAINER ID" | fzf --height 40% --border --ansi | awk '{print $1}')
         fi
 
         echo "$selected"
@@ -126,17 +156,17 @@ function handle_dock() {
         # [Logic for deleting all exited containers]
         -n|--none)
             echo -e "Deleting all none images & containers\n"
-            images=$(docker images | grep '^<none>' | awk '{print $3}')
-            conts=$(docker ps -a | grep '^<none>' | awk '{print $1}')
+            images=$($container_tool images | grep '^<none>' | awk '{print $3}')
+            conts=$($container_tool ps -a | grep '^<none>' | awk '{print $1}')
 
             if [ -n "$images" ]; then
-                docker rmi -f $images
+                $container_tool rmi -f $images
             else 
                 echo "No none images"
             fi
 
             if [ -n "$conts" ]; then
-                docker rm -f $conts
+                $container_tool rm -f $conts
             else
                 echo "No none containers to delete."
             fi
@@ -144,9 +174,9 @@ function handle_dock() {
         # [Logic for deleting all exited containers]
         -e|--exited)
             echo -e "Deleting all exited containers"
-            conts=$(docker ps -a | grep 'Exited' | awk '{print $1}')
+            conts=$($container_tool ps -a | grep 'Exited' | awk '{print $1}')
             if [ -n "$conts" ]; then
-                docker rm -f $conts
+                $container_tool rm -f $conts
             else
                 echo -e "\nNo exited containers"
             fi
@@ -154,12 +184,12 @@ function handle_dock() {
         # [Logic for deleting the last image created]
         -l|--last)
             # Cecking if there's any images exists
-            if [[ "$(docker images -q)" == "" ]]; then
+            if [[ "$($container_tool images -q)" == "" ]]; then
                 echo -e "\nNo images to delete"
             else 
                 echo -e "\nDeleting last image created"
-                last=$(docker images | head -n 2 | tail -n 1 | awk '{print $3}')
-                docker rmi -f $last
+                last=$($container_tool images | head -n 2 | tail -n 1 | awk '{print $3}')
+                $container_tool rmi -f $last
                 # Checking if the last image is deleted or not
                 if [ $? -eq 0 ]; then
                     echo -e "\nLast image deleted"
@@ -167,11 +197,11 @@ function handle_dock() {
                     echo -e "\nLast image not deleted\n"
                     read -p "Do you want to stop and delete the container? [y/n] " ans
                     if [ $ans == 'y' ]; then
-                        docker ps && echo
+                        $container_tool ps && echo
                         read -p "Enter container ID: " cont_id
-                        docker stop $cont_id
-                        docker rm $cont_id
-                        docker rmi -f $last
+                        $container_tool stop $cont_id
+                        $container_tool rm $cont_id
+                        $container_tool rmi -f $last
                         echo -e "\nLast image deleted"
                     else
                         echo -e "\nLast image not deleted"
@@ -182,9 +212,9 @@ function handle_dock() {
         # [Logic for deleting all created containers]
         -ct|--created)
             echo -e "\nDeleting all created containers"
-            conts=$(docker ps -a | grep 'Created' | awk '{print $1}')
+            conts=$($container_tool ps -a | grep 'Created' | awk '{print $1}')
             if [ -n "$conts" ]; then
-                docker rm -f $conts
+                $container_tool rm -f $conts
             else
                 echo -e "\nNo created containers to delete."
             fi
@@ -193,7 +223,7 @@ function handle_dock() {
         -i|--image)
             local selected_images=$(select_with_fzf image)
             if [ -n "$selected_images" ]; then
-                docker rmi -f $selected_images
+                $container_tool rmi -f $selected_images
             else
                 echo "No images selected to delete."
             fi
@@ -202,7 +232,7 @@ function handle_dock() {
         -c|--container)
             local selected_containers=$(select_with_fzf container)
             if [ -n "$selected_containers" ]; then
-                docker rm -f $selected_containers
+                $container_tool rm -f $selected_containers
             else
                 echo "No containers selected to delete."
             fi
@@ -211,7 +241,7 @@ function handle_dock() {
         -k|--kill)
             local selected_containers=$(select_with_fzf container)
             if [ -n "$selected_containers" ]; then
-                docker kill -f $selected_containers
+                $container_tool kill -f $selected_containers
             else
                 echo "No containers selected to kill."
             fi

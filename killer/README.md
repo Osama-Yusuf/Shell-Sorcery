@@ -15,12 +15,14 @@ Killer provides tools to manage system resources, including processes and Docker
 * Kill processes occupying a specific port
 * Terminate the most resource-consuming processes based on CPU or memory usage
 * Manage Docker containers and images, including batch removal and cleaning up unused resources
+* Cross-platform compatibility: macOS and Linux
+* Cross-container-platform compatibility: Docker and Podman
 
 ## Prerequisites
 
 * `netstat` or `lsof` for identifying processes by port
 * `ps` for process management
-* Docker for container and image management
+* Docker/Podman for container and image management
 * `fzf` for interactive selection in Docker management
 
 ## Installation
