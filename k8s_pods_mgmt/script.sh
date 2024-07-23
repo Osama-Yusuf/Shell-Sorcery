@@ -7,6 +7,7 @@ show_help() {
     echo
     echo -e "Example: $0 dev books\nThis will list all book pods in the dev namespace\n"
     echo -e "Example: $0 dev books logs\nThis will log the first book pod in the dev namespace\n"
+    echo -e "Example: $0 dev books logs each\nThis will log each book pod in the dev namespace in a loop\n"
     echo -e "Example: $0 dev books describe\nThis will describe the first book pod in the dev namespace\n"
     echo -e "Example: $0 dev books exec\nThis will exec into the first book pod in the dev namespace\n"
     echo -e "Example: $0 dev books delete\nThis will delete the book pods in the dev namespace one by one, only when the user confirms with yes\n"
@@ -15,7 +16,7 @@ show_help() {
     echo -e "Example: $0 dev books envs VAR_NAME\nThis will show environment variables containing VAR_NAME of the first book pod in the dev namespace"
 }
 
-# check if the above command successeded if not exit
+# check if the above command succeeded if not exit
 check_success() {
     if [ $? -ne 0 ]; then
         echo -e "$1\n"
@@ -58,6 +59,20 @@ log_pod() {
     microservice=$2
     first_pod_name "$chosen_namespace" "$microservice"
     kubectl logs -n $chosen_namespace $first_pod_name
+}
+
+log_all_pods() {
+    chosen_namespace=$1
+    microservice=$2
+    pod_names "$chosen_namespace" "$microservice"
+    while true; do
+        for pod in $POD_NAMES; do
+            echo "Logs for pod $pod:"
+            kubectl logs -n $chosen_namespace $pod
+            sleep 4
+            clear
+        done
+    done
 }
 
 describe_pod() {
@@ -173,7 +188,12 @@ no_args_passed() {
     # Check the user's choice and execute the corresponding operation
     case $operation in
         logs)
-            log_pod "$chosen_namespace" "$microservice"
+            read -p "Do you want to log each pod in a loop? (yes/no): " each_choice
+            if [[ "$each_choice" == "yes" ]]; then
+                log_all_pods "$chosen_namespace" "$microservice"
+            else
+                log_pod "$chosen_namespace" "$microservice"
+            fi
             ;;
         describe)
             describe_pod "$chosen_namespace" "$microservice"
@@ -227,6 +247,10 @@ main() {
                 false || check_success "Invalid operation. Exiting."
                 ;;
         esac
+    elif [ "$#" -eq 4 ] && [ "$3" == "logs" ]; then
+        chosen_namespace=$1
+        microservice=$2
+        log_all_pods "$chosen_namespace" "$microservice"
     elif [ "$#" -eq 4 ] && [ "$3" == "envs" ]; then
         chosen_namespace=$1
         microservice=$2
