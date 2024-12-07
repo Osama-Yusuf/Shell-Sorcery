@@ -15,8 +15,8 @@ if [ "$1" = "-d" ]; then
         echo "Error: No string provided for decoding"
         exit 1
     fi
-    echo "$2" | base64 --decode
+    echo -n "$2" | base64 --decode
 else
     # Encode the provided string
-    echo "$1" | base64
+    echo -n "$1" | base64
 fi
