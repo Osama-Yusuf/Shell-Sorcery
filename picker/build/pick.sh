@@ -309,6 +309,86 @@ namespace_selector() {
 	kubectl config set-context --current --namespace=$namespace
 }
 
+namespace_argument_handler() {
+	local target_namespace="$1"
+	
+	# Check if the provided namespace exists
+	if kubectl get namespace "$target_namespace" &> /dev/null; then
+		echo "Switching to namespace: $target_namespace"
+		kubectl config set-context --current --namespace="$target_namespace"
+		exit 0
+	else
+		echo "Namespace '$target_namespace' doesn't exist."
+		
+		# Get all available namespaces and find similar ones
+		local available_namespaces=$(kubectl get ns --no-headers -o custom-columns=":metadata.name")
+		local similar_namespaces=$(echo "$available_namespaces" | grep -i "$target_namespace" | head -3)
+		
+		if [ -n "$similar_namespaces" ]; then
+			echo "Did you mean one of these?"
+			echo "$similar_namespaces"
+			echo ""
+			echo "Options:"
+			echo "  Y - Switch to a suggested namespace"
+			echo "  F - Open fzf menu to select from all namespaces"
+			echo "  N - Exit"
+		else
+			echo "No similar namespaces found."
+			echo ""
+			echo "Options:"
+			echo "  F - Open fzf menu to select from all namespaces"
+			echo "  N - Exit"
+		fi
+		
+		echo ""
+		if [ -n "$similar_namespaces" ]; then
+			read -p "Your choice (Y/F/N): " choice
+		else
+			read -p "Your choice (F/N): " choice
+		fi
+		
+		case "$choice" in
+			[Yy]*)
+				if [ -n "$similar_namespaces" ]; then
+					# If only one similar namespace, use it directly
+					local namespace_count=$(echo "$similar_namespaces" | wc -l)
+					if [ "$namespace_count" -eq 1 ]; then
+						local selected_namespace="$similar_namespaces"
+						echo "Switching to namespace: $selected_namespace"
+						kubectl config set-context --current --namespace="$selected_namespace"
+					else
+						# Multiple similar namespaces, let user pick with fzf
+						fzf_checker
+						local selected_namespace=$(echo "$similar_namespaces" | fzf --cycle --reverse --height 50% --border --prompt "Select a namespace: " --preview "echo {}" --preview-window down:1:wrap)
+						if [ -n "$selected_namespace" ]; then
+							echo "Switching to namespace: $selected_namespace"
+							kubectl config set-context --current --namespace="$selected_namespace"
+						else
+							echo "No namespace selected"
+							exit 1
+						fi
+					fi
+				else
+					echo "No suggestions available"
+					exit 1
+				fi
+				;;
+			[Ff]*)
+				fzf_checker
+				namespace_selector
+				;;
+			[Nn]*)
+				echo "Exiting"
+				exit 0
+				;;
+			*)
+				echo "Invalid choice. Exiting"
+				exit 1
+				;;
+		esac
+	fi
+}
+
 eks_selector() {
 	selected_cluster=$(kubectl config get-contexts | grep -v NAME | awk '{print $2}' | fzf --multi --cycle --reverse --height 10% --border --prompt "Select a cluster: " --preview "echo {}" --preview-window down:1:wrap)
 	# Check if a cluster was selected
@@ -356,10 +436,14 @@ then
 	then
 		kubectl config view --minify --output 'jsonpath={..namespace}'
 		exit 1
+	elif [ -n "$2" ]
+	then
+		namespace_argument_handler "$2"
+	else
+		# No second argument provided, use fzf selector
+		fzf_checker
+		namespace_selector
 	fi
-	# check if fzf is installed if not install it
-	fzf_checker
-	namespace_selector
 elif [ "$1" == "host" ] && [ "$2" == "add" ]; then
 	if [ "$3" == "host" ]
 	then
