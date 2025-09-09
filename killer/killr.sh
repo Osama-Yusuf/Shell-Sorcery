@@ -1,57 +1,66 @@
 #!/bin/bash
 
 # Function for handling port argument
-function handle_port() {
-    # Check if a port number is provided as the second argument
-    if [ $# -lt 1 ]; then
-        echo "Usage: $0 port <port-number>"
-        exit 1
-    fi
+handle_port() {
+  if [ $# -lt 1 ]; then
+    echo "Usage: $0 port <port-number>"
+    exit 1
+  fi
+  local port="$1"
+  local pid=""
 
-    local port=$1
+  # 1) Try lsof first (works on macOS & Linux)
+  # -nP -> no DNS/port lookups, -iTCP:PORT, -sTCP:LISTEN for listeners, -t -> PIDs only
+  if command -v lsof >/dev/null 2>&1; then
+    pid="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -n1)"
+    # If nothing, try any TCP state (maybe it's an active connection, not a listener)
+    [ -z "$pid" ] && pid="$(lsof -nP -iTCP:"$port" -t 2>/dev/null | head -n1)"
+  fi
 
-    # Find the process using the given port with netstat
-    local pid_info=$(netstat -tulnp 2>/dev/null | grep ":$port" | awk '{print $7}')
-    local pid=$(echo $pid_info | cut -d'/' -f1)
+  # 2) Linux fallback: ss (socket statistics)
+  if [ -z "$pid" ] && command -v ss >/dev/null 2>&1; then
+    # Example line users:(("python3",pid=1234,fd=5))
+    pid="$(ss -lptn "sport = :$port" 2>/dev/null | awk -F 'pid=' 'NR>1 {split($2,a,/,/); if (a[1] ~ /^[0-9]+$/){print a[1]; exit}}')"
+    # Also try non-listening sockets
+    [ -z "$pid" ] && pid="$(ss -ptn "sport = :$port" 2>/dev/null | awk -F 'pid=' 'NR>1 {split($2,a,/,/); if (a[1] ~ /^[0-9]+$/){print a[1]; exit}}')"
+  fi
 
-    # Check if netstat output is a dash or empty, then try with lsof
-    if [ "$pid" = "-" ] || [ -z "$pid" ]; then
-        pid=$(lsof -i TCP:$port -t 2>/dev/null)
-    fi
+  # 3) Last resort: netstat (Linux; macOS netstat -tulnp doesn’t exist)
+  if [ -z "$pid" ] && command -v netstat >/dev/null 2>&1; then
+    pid="$(netstat -tulnp 2>/dev/null | awk -v p=":$port" '$0 ~ p {print $7}' | head -n1 | cut -d/ -f1)"
+  fi
 
-    # Check if any valid process ID is found
-    if [ -z "$pid" ]; then
-        if [ "$(id -u)" -ne 0 ]; then
-            echo "Some processes may be hidden; run as root for full visibility"
-        else
-            echo "No process is using port $port"
-        fi
-        exit 0
+  if [ -z "$pid" ]; then
+    if [ "$(id -u)" -ne 0 ]; then
+      echo "No visible process is using port $port. Some may require sudo to see."
     else
-        # Display process details
-        echo "Process using port $port:"
-        ps -p $pid -o comm,pcpu,pid
-        if [ $? -ne 0 ]; then
-            echo -e "\nUnable to retrieve process details. You might need root privileges."
-            exit 1
-        fi
-
-        while true; do
-            # Display message and wait for user input
-            read -p "Press Enter to kill the process or Ctrl+C to exit." -r key
-
-            # Check if Enter key is pressed
-            if [ -z "$key" ]; then
-                # Kill the process
-                kill $pid
-                echo "Process killed."
-                break
-            else
-                echo "Invalid input. Try again."
-            fi
-        done
+      echo "No process is using port $port."
     fi
+    exit 0
+  fi
+
+  # Show details safely (BSD/mac and GNU both accept this set)
+  # Use 'command' on mac, not 'comm', for more reliable output
+  echo "Process using port $port:"
+  if ps -p "$pid" -o pid= -o user= -o pcpu= -o pmem= -o command= >/dev/null 2>&1; then
+    ps -p "$pid" -o pid= -o user= -o pcpu= -o pmem= -o command= | awk '{printf "PID:%s USER:%s CPU:%s%% MEM:%s%% CMD:%s\n",$1,$2,$3,$4,substr($0, index($0,$5))}'
+  else
+    # ultra-compat fallback
+    ps -p "$pid"
+  fi
+
+  # Confirm then try graceful kill before SIGKILL
+  read -p "Press Enter to kill PID $pid (TERM), or type '9' for SIGKILL, Ctrl+C to abort: " choice
+  if [ "$choice" = "9" ]; then
+    kill -9 "$pid" && echo "Process $pid killed (SIGKILL)." || { echo "Failed to kill $pid."; exit 1; }
+  else
+    kill "$pid" && echo "Process $pid terminated (SIGTERM)." || {
+      echo "SIGTERM failed; try: sudo kill -9 $pid"
+      exit 1
+    }
+  fi
 }
+
 
 # Function for handling res argument
 function handle_res() {
@@ -71,20 +80,40 @@ function handle_res() {
         echo "Process killed."
     }
 
-    # Check if the argument is cpu or mem
-    if [ "$1" == "cpu" ]; then
-        # Find the PID and CPU% of the most CPU-consuming process
-        read pid cpu <<< $(ps -eo pid,%cpu --sort=-%cpu | head -n 2 | tail -n 1 | awk '{print $1, $2}')
-        confirm_and_kill $pid $cpu%
+    local mode=$1
+    local pid=""
+    local metric=""
 
-    elif [ "$1" == "mem" ]; then
-        # Find the PID and MEM% of the most memory-consuming process
-        read pid mem <<< $(ps -eo pid,%mem --sort=-%mem | head -n 2 | tail -n 1 | awk '{print $1, $2}')
-        confirm_and_kill $pid $mem%
-
+    if [ "$mode" == "cpu" ]; then
+        if [ "$(uname -s)" = "Darwin" ]; then
+            # macOS: sort by CPU with -r
+            read pid metric <<< $(ps -Ao pid,pcpu -r | awk 'NR==2 {print $1, $2}')
+        else
+            # GNU ps
+            read pid metric <<< $(ps -eo pid,%cpu --sort=-%cpu | awk 'NR==2 {print $1, $2}')
+        fi
+    elif [ "$mode" == "mem" ]; then
+        if [ "$(uname -s)" = "Darwin" ]; then
+            # macOS: sort by memory with -m
+            read pid metric <<< $(ps -Ao pid,pmem -m | awk 'NR==2 {print $1, $2}')
+        else
+            # GNU ps
+            read pid metric <<< $(ps -eo pid,%mem --sort=-%mem | awk 'NR==2 {print $1, $2}')
+        fi
     else
         echo "Invalid argument. Please use 'cpu' or 'mem'."
+        return 1
     fi
+
+    # Validate PID before proceeding
+    case "$pid" in
+        ""|*[!0-9]*)
+            echo "Unable to determine the target process."
+            return 1
+            ;;
+    esac
+
+    confirm_and_kill "$pid" "${metric}%"
 }
 # Function to check if Docker or Podman is installed and available
 check_container_tool() {
