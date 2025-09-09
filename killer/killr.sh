@@ -3,34 +3,39 @@
 # Function for handling port argument
 handle_port() {
   if [ $# -lt 1 ]; then
-    echo "Usage: $0 port <port-number>"
+    echo "Usage: $0 port <port-number> [--include-root]"
     exit 1
   fi
+
   local port="$1"
-  local pid=""
+  shift || true
+  local include_root="no"
+  [ "${1:-}" = "--include-root" ] && include_root="yes"
 
-  # 1) Try lsof first (works on macOS & Linux)
-  # -nP -> no DNS/port lookups, -iTCP:PORT, -sTCP:LISTEN for listeners, -t -> PIDs only
-  if command -v lsof >/dev/null 2>&1; then
-    pid="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -n1)"
-    # If nothing, try any TCP state (maybe it's an active connection, not a listener)
-    [ -z "$pid" ] && pid="$(lsof -nP -iTCP:"$port" -t 2>/dev/null | head -n1)"
-  fi
+  # Collect candidate PIDs (listeners first, then any TCP usage)
+  collect_pids() {
+    local pids=""
+    if command -v lsof >/dev/null 2>&1; then
+      # listeners
+      pids="$pids $(lsof -nP -iTCP:$port -sTCP:LISTEN -t 2>/dev/null)"
+      # any tcp usage (connections)
+      pids="$pids $(lsof -nP -iTCP:$port -t 2>/dev/null)"
+    fi
+    if [ -z "$pids" ] && command -v ss >/dev/null 2>&1; then
+      pids="$pids $(ss -lptn "sport = :$port" 2>/dev/null | awk -F 'pid=' 'NR>1{split($2,a,/,/);if(a[1]~/^[0-9]+$/)print a[1]}')"
+      pids="$pids $(ss -ptn "sport = :$port" 2>/dev/null  | awk -F 'pid=' 'NR>1{split($2,a,/,/);if(a[1]~/^[0-9]+$/)print a[1]}')"
+    fi
+    if [ -z "$pids" ] && command -v netstat >/dev/null 2>&1; then
+      pids="$pids $(netstat -tulnp 2>/dev/null | awk -v p=":$port" '$0 ~ p {print $7}' | cut -d/ -f1)"
+    fi
 
-  # 2) Linux fallback: ss (socket statistics)
-  if [ -z "$pid" ] && command -v ss >/dev/null 2>&1; then
-    # Example line users:(("python3",pid=1234,fd=5))
-    pid="$(ss -lptn "sport = :$port" 2>/dev/null | awk -F 'pid=' 'NR>1 {split($2,a,/,/); if (a[1] ~ /^[0-9]+$/){print a[1]; exit}}')"
-    # Also try non-listening sockets
-    [ -z "$pid" ] && pid="$(ss -ptn "sport = :$port" 2>/dev/null | awk -F 'pid=' 'NR>1 {split($2,a,/,/); if (a[1] ~ /^[0-9]+$/){print a[1]; exit}}')"
-  fi
+    # normalize: one per line, numbers only, unique, preserve order
+    echo "$pids" | tr ' ' '\n' | awk '/^[0-9]+$/{print}' | awk '!seen[$0]++'
+  }
 
-  # 3) Last resort: netstat (Linux; macOS netstat -tulnp doesn’t exist)
-  if [ -z "$pid" ] && command -v netstat >/dev/null 2>&1; then
-    pid="$(netstat -tulnp 2>/dev/null | awk -v p=":$port" '$0 ~ p {print $7}' | head -n1 | cut -d/ -f1)"
-  fi
+  mapfile -t PID_LIST < <(collect_pids)
 
-  if [ -z "$pid" ]; then
+  if [ ${#PID_LIST[@]} -eq 0 ]; then
     if [ "$(id -u)" -ne 0 ]; then
       echo "No visible process is using port $port. Some may require sudo to see."
     else
@@ -39,28 +44,62 @@ handle_port() {
     exit 0
   fi
 
-  # Show details safely (BSD/mac and GNU both accept this set)
-  # Use 'command' on mac, not 'comm', for more reliable output
-  echo "Process using port $port:"
-  if ps -p "$pid" -o pid= -o user= -o pcpu= -o pmem= -o command= >/dev/null 2>&1; then
-    ps -p "$pid" -o pid= -o user= -o pcpu= -o pmem= -o command= | awk '{printf "PID:%s USER:%s CPU:%s%% MEM:%s%% CMD:%s\n",$1,$2,$3,$4,substr($0, index($0,$5))}'
-  else
-    # ultra-compat fallback
-    ps -p "$pid"
-  fi
+  echo "Found ${#PID_LIST[@]} PID(s) using port $port."
 
-  # Confirm then try graceful kill before SIGKILL
-  read -p "Press Enter to kill PID $pid (TERM), or type '9' for SIGKILL, Ctrl+C to abort: " choice
-  if [ "$choice" = "9" ]; then
-    kill -9 "$pid" && echo "Process $pid killed (SIGKILL)." || { echo "Failed to kill $pid."; exit 1; }
-  else
-    kill "$pid" && echo "Process $pid terminated (SIGTERM)." || {
-      echo "SIGTERM failed; try: sudo kill -9 $pid"
-      exit 1
-    }
-  fi
+  for pid in "${PID_LIST[@]}"; do
+    # get owner to optionally skip root/system
+    owner="$(ps -p "$pid" -o user= 2>/dev/null | awk '{print $1}')"
+    if [ -z "$owner" ]; then
+      # process may have exited; skip
+      continue
+    fi
+    if [ "$include_root" != "yes" ] && [ "$owner" = "root" ]; then
+      echo "Skipping PID $pid (root-owned). Use --include-root to target it."
+      continue
+    fi
+
+    # Try a detailed line that works on BSD/GNU ps
+    if ps -p "$pid" -o pid= -o user= -o pcpu= -o pmem= -o command= >/dev/null 2>&1; then
+      line="$(ps -p "$pid" -o pid= -o user= -o pcpu= -o pmem= -o command= | awk '{printf "PID:%s USER:%s CPU:%s%% MEM:%s%% CMD:%s\n",$1,$2,$3,$4,substr($0, index($0,$5))}')"
+    else
+      line="$(ps -p "$pid")"
+    fi
+
+    echo "———"
+    echo "$line"
+    echo "Action: [Enter]=TERM, 9=SIGKILL, s=skip, a=skip all, q=quit"
+    read -r choice
+
+    case "$choice" in
+      9)
+        if kill -9 "$pid" 2>/dev/null; then
+          echo "Killed PID $pid (SIGKILL)."
+        else
+          echo "Failed to kill PID $pid."
+        fi
+        ;;
+      s|S)
+        echo "Skipped PID $pid."
+        continue
+        ;;
+      a|A)
+        echo "Aborting remaining PIDs."
+        break
+        ;;
+      q|Q)
+        echo "Quit."
+        exit 0
+        ;;
+      *)
+        if kill "$pid" 2>/dev/null; then
+          echo "Terminated PID $pid (SIGTERM)."
+        else
+          echo "SIGTERM failed; try: sudo kill -9 $pid"
+        fi
+        ;;
+    esac
+  done
 }
-
 
 # Function for handling res argument
 function handle_res() {
