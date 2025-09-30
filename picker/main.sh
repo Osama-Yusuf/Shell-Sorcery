@@ -3,6 +3,7 @@
 source ./modules/dependencies.sh
 source ./modules/aws.sh
 source ./modules/host.sh
+source ./modules/pod.sh
 
 # execute set-x if got --debug flag at any position as argument
 if [[ "$*" == *--debug* ]]
@@ -178,6 +179,29 @@ then
 		fzf_checker
 		namespace_selector
 	fi
+elif [ "$1" == "pod" ]
+then
+	if [ -z "$2" ]
+	then
+		# Default: show saved entries and exec into selected pod
+		pod_exec
+		exit 1
+	elif [ "$2" == "cur" ]
+	then
+		pod_current_context
+		exit 1
+	elif [ "$2" == "add" ]
+	then
+		pod_add
+		exit 1
+	elif [ "$2" == "list" ]
+	then
+		pod_list
+		exit 1
+	else
+		echo "Usage: pick.sh pod {add | cur | list}"
+		exit 1
+	fi
 elif [ "$1" == "host" ] && [ "$2" == "add" ]; then
 	if [ "$3" == "host" ]
 	then
@@ -260,6 +284,18 @@ ns
    Subcommands:
 	cur
 		- Shows the current K8s namespace
+
+pod
+   - Save and exec into K8s pods by friendly name.
+   Subcommands:
+       cur
+           - Shows the current K8s context
+       add
+           - Pick ns -> pod with fzf, name it, choose shell, and save (name - ns - context)
+       list
+           - List saved pod entries
+   Default behavior without subcommand:
+       - Show saved entries; ensure context matches or prompt to switch; execs into pod with saved shell
 
 host
    - Pick a host to SSH into
