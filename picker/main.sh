@@ -4,6 +4,7 @@ source ./modules/dependencies.sh
 source ./modules/aws.sh
 source ./modules/host.sh
 source ./modules/pod.sh
+source ./modules/context.sh
 
 # execute set-x if got --debug flag at any position as argument
 if [[ "$*" == *--debug* ]]
@@ -259,6 +260,20 @@ echo "from=from host & to=to host"
 elif [ "$1" == "host" ]; then
 	pickhost_checker
 	ssh_host
+elif [ "$1" == "context" ]
+then
+	if [ "$2" == "cur" ]
+	then
+		kubectl config current-context
+		exit 1
+	elif [ -n "$2" ]
+	then
+		context_argument_handler "$2"
+	else
+		# No second argument provided, use fzf selector
+		fzf_checker
+		context_selector
+	fi
 else
 	echo "Usage: pick.sh {command}
 
@@ -319,5 +334,15 @@ host
 		- Removes an existing host or group
 		Options:
 			host - Remove a host
-			group - Remove a group"
+			group - Remove a group
+
+context
+   - Pick a Kubernetes context from kubeconfig
+   Subcommands:
+	cur
+		- Shows the current Kubernetes context
+   Default behavior without subcommand:
+	- Shows fzf menu to select context
+   With context name argument:
+	- Switches directly to specified context"
 fi
