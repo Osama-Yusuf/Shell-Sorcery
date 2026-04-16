@@ -16,15 +16,17 @@ check_git_init() {
 }
 
 link() {
-    github_link=$(git remote -v | awk 'NR==1{print $2}')
-    current_branch=$(git branch | awk '{print $2}')
+    current_branch=$(git rev-parse --abbrev-ref HEAD)
+    github_link=$(git remote get-url origin)
 
     # Normalize SSH URL to HTTPS and strip .git suffix
+
     github_link=$(echo "$github_link" \
         | sed 's|git@github.com:|https://github.com/|' \
         | sed 's|\.git$||')
 
     github_link="${github_link}/tree/${current_branch}"
+
 
     OS=$(uname -s)
     if [ "$OS" = "Darwin" ]; then
@@ -40,10 +42,11 @@ link() {
 }
 
 push() {
-    current_branch=$(git branch | awk '{print $2}')
-    current_remote_name=$(git remote -v | awk 'NR==1{print $1}')
-    if [ $# -gt 1 ]; then
-        commit_message=$*
+    current_branch=$(git rev-parse --abbrev-ref HEAD)
+    current_remote_name=$(git config --get "branch.${current_branch}.remote" || echo "origin")
+    shift  # remove "push" from $@
+    if [ $# -ge 1 ]; then
+        commit_message="$*"
         # The first argument(push) will be there in the commit we need to remove it
         commit_message=${commit_message:5}
         echo -e "Commit message: "$commit_message"\n"
@@ -56,15 +59,15 @@ push() {
 }
 
 pull() {
-    current_branch=$(git branch | awk '{print $2}')
-    current_remote_name=$(git remote -v | awk 'NR==1{print $1}')
+    current_branch=$(git rev-parse --abbrev-ref HEAD)
+    current_remote_name=$(git config --get "branch.${current_branch}.remote" || echo "origin")
     echo "Pulling updates from $current_remote_name/$current_branch..."
     git pull $current_remote_name $current_branch
 }
 
 pr() {
-    github_link=$(git remote -v | awk 'NR==1{print $2}')
-    current_branch=$(git branch | awk '{print $2}')
+    current_branch=$(git rev-parse --abbrev-ref HEAD)
+    github_link=$(git remote get-url origin)
 
     # Normalize SSH URL to HTTPS and strip .git suffix
     github_link=$(echo "$github_link" \
@@ -124,4 +127,3 @@ else
     echo "Usage: get.sh {push | link | pull}"
     # exit 1
 fi
-
